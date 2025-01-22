@@ -3,87 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Photo and QR Code Submission</title>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <title>Scan QR Code and Submit</title>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
             padding: 20px;
         }
-        video, canvas {
+        #qr-reader {
             width: 100%;
-            max-width: 300px;
-            margin: 10px 0;
+            max-width: 400px;
+            margin: 0 auto;
         }
     </style>
 </head>
 <body>
-    <h1>Capture Photo & Submit QR Code</h1>
+    <h1>Scan QR Code & Submit Data</h1>
 
-    <!-- Camera Section -->
-    <video id="video" autoplay playsinline></video>
-    <button id="capture">Capture Photo</button>
-    <canvas id="canvas"></canvas>
-
-    <!-- QR Code Section -->
-    <form id="qrForm">
-        <input type="text" id="batchName" placeholder="Batch Name" required><br>
-        <input type="text" id="name" placeholder="Name" required><br>
-        <input type="text" id="transactionId" placeholder="Transaction ID" required><br>
-        <button type="submit">Generate QR & Submit</button>
-    </form>
-
-    <div id="qrCode"></div>
+    <!-- QR Code Scanner -->
+    <div id="qr-reader"></div>
+    <div id="qr-result">
+        <h3>Scanned Data:</h3>
+        <p id="scanned-data">None</p>
+    </div>
 
     <script>
-        // Camera setup
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const context = canvas.getContext('2d');
+        const qrReader = new Html5Qrcode("qr-reader");
 
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then((stream) => {
-                video.srcObject = stream;
-            })
-            .catch((err) => console.error('Camera error:', err));
+        qrReader.start(
+            { facingMode: "environment" },
+            {
+                fps: 10,
+                qrbox: 250
+            },
+            (decodedText) => {
+                // Display scanned data
+                document.getElementById("scanned-data").textContent = decodedText;
 
-        // Capture photo
-        document.getElementById('capture').addEventListener('click', () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        });
+                // Extract data from QR code
+                const [batchName, name, transactionId] = decodedText.split(',').map(item => item.split(':')[1].trim());
 
-        // QR Code generation and submission
-        document.getElementById('qrForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const batchName = document.getElementById('batchName').value;
-            const name = document.getElementById('name').value;
-            const transactionId = document.getElementById('transactionId').value;
-            const qrData = `Batch Name: ${batchName}, Name: ${name}, Transaction ID: ${transactionId}`;
-
-            // Generate QR Code
-            const qrCodeDiv = document.getElementById('qrCode');
-            qrCodeDiv.innerHTML = ''; // Clear previous QR code
-            QRCode.toCanvas(document.createElement('canvas'), qrData, (err, canvas) => {
-                if (err) return console.error('QR Code error:', err);
-                qrCodeDiv.appendChild(canvas);
-            });
-
-            // Send data to Google Sheets
-            try {
-                await fetch('YOUR_GOOGLE_APPS_SCRIPT_URL', {
+                // Send data to Google Sheets
+                fetch('https://script.google.com/macros/s/AKfycbyBKV07oh_Stw8k5lMjgvLvZlXG0jaMgCgRTx7submb6M0xT5KnyoXkcumAZSxfWtC7/exec', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ batchName, name, transactionId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert('Data submitted successfully!');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to submit data.');
                 });
-                alert('Data submitted successfully!');
-            } catch (err) {
-                console.error('Submission error:', err);
-                alert('Failed to submit data.');
+
+                // Stop scanner after successful scan
+                qrReader.stop();
+            },
+            (errorMessage) => {
+                console.error('QR Code Scan Error:', errorMessage);
             }
+        ).catch((err) => {
+            console.error('Error starting QR Code scanner:', err);
         });
     </script>
 </body>
