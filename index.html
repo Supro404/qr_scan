@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Photo and QR Code Submission</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        video, canvas {
+            width: 100%;
+            max-width: 300px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Capture Photo & Submit QR Code</h1>
+
+    <!-- Camera Section -->
+    <video id="video" autoplay playsinline></video>
+    <button id="capture">Capture Photo</button>
+    <canvas id="canvas"></canvas>
+
+    <!-- QR Code Section -->
+    <form id="qrForm">
+        <input type="text" id="batchName" placeholder="Batch Name" required><br>
+        <input type="text" id="name" placeholder="Name" required><br>
+        <input type="text" id="transactionId" placeholder="Transaction ID" required><br>
+        <button type="submit">Generate QR & Submit</button>
+    </form>
+
+    <div id="qrCode"></div>
+
+    <script>
+        // Camera setup
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((err) => console.error('Camera error:', err));
+
+        // Capture photo
+        document.getElementById('capture').addEventListener('click', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        });
+
+        // QR Code generation and submission
+        document.getElementById('qrForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const batchName = document.getElementById('batchName').value;
+            const name = document.getElementById('name').value;
+            const transactionId = document.getElementById('transactionId').value;
+            const qrData = `Batch Name: ${batchName}, Name: ${name}, Transaction ID: ${transactionId}`;
+
+            // Generate QR Code
+            const qrCodeDiv = document.getElementById('qrCode');
+            qrCodeDiv.innerHTML = ''; // Clear previous QR code
+            QRCode.toCanvas(document.createElement('canvas'), qrData, (err, canvas) => {
+                if (err) return console.error('QR Code error:', err);
+                qrCodeDiv.appendChild(canvas);
+            });
+
+            // Send data to Google Sheets
+            try {
+                await fetch('YOUR_GOOGLE_APPS_SCRIPT_URL', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ batchName, name, transactionId })
+                });
+                alert('Data submitted successfully!');
+            } catch (err) {
+                console.error('Submission error:', err);
+                alert('Failed to submit data.');
+            }
+        });
+    </script>
+</body>
+</html>
